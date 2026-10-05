@@ -68,7 +68,14 @@ h1 em{font-style:italic;font-weight:500;color:var(--accent)}
 .btn.primary{background:var(--ink);color:var(--paper)}
 .btn:hover{transform:translateY(-2px)}
 .btn.ghost:hover{background:var(--ink);color:var(--paper)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:center;gap:32px}
+.hero-art{position:relative;aspect-ratio:1/1;width:100%;max-width:500px;justify-self:center;align-self:center}
+#orb{width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y}
+#orb:active{cursor:grabbing}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr}.hero-art{max-width:340px;justify-self:center;order:-1;margin-bottom:-10px}}
+@media(max-width:600px){.hero-art{max-width:260px}}
 .scrollcue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:2;font-size:11px;letter-spacing:.2em;color:var(--ink-3);text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:8px}
+@media(max-width:600px){.scrollcue{display:none}}
 .scrollcue i{width:1px;height:38px;background:linear-gradient(var(--ink-3),transparent);animation:cue 2.2s infinite}
 @keyframes cue{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
 
@@ -239,7 +246,8 @@ footer.site .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:
 
 <header class="hero" id="top">
   <canvas id="topo" aria-hidden="true"></canvas>
-  <div class="wrap">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
     <div class="coords mono"><span>49.49° N · 117.29° W</span><span>Nelson, British Columbia</span><span>Roots in Nepal</span></div>
     <h1>Kshitiz<br><em>Bhattarai</em></h1>
     <p class="lede">I build systems that turn data into decisions — and keep them secure.</p>
@@ -255,6 +263,8 @@ footer.site .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       <a class="btn ghost" href="#contact">Get in touch</a>
     </div>
+    </div>
+    <div class="hero-art" aria-hidden="true"><canvas id="orb"></canvas></div>
   </div>
   <div class="scrollcue mono">Scroll<i></i></div>
 </header>
@@ -704,6 +714,118 @@ footer.site .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:
     stops.forEach(function(s){s.classList.toggle('on',s.getBoundingClientRect().top<mid)});
   }
   addEventListener('scroll',onScroll,{passive:true}); onScroll();
+})();
+</script>
+<script>
+/* rotating geodesic network beside the name — symmetric by construction */
+(function(){
+  var c=document.getElementById('orb'); if(!c) return;
+  var x=c.getContext('2d'), root=document.documentElement;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // icosahedron
+  var t=(1+Math.sqrt(5))/2, V=[[-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],[0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],[t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]];
+  var F=[[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+  function norm(v,r){var l=Math.hypot(v[0],v[1],v[2]);return [v[0]/l*r,v[1]/l*r,v[2]/l*r];}
+  var nodes=[], edges=[], mid={};
+  V.forEach(function(v){nodes.push({p:norm(v,1),k:0});});                 // 12 gold vertices
+  function m(a,b){var key=a<b?a+'_'+b:b+'_'+a; if(mid[key]!=null) return mid[key];
+    var A=nodes[a].p,B=nodes[b].p; nodes.push({p:norm([A[0]+B[0],A[1]+B[1],A[2]+B[2]],1),k:1}); return mid[key]=nodes.length-1;}
+  var seen={}; function E(a,b,k){var key=a<b?a+'_'+b:b+'_'+a; if(seen[key])return; seen[key]=1; edges.push([a,b,k]);}
+  F.forEach(function(f){var a=f[0],b=f[1],cc=f[2],ab=m(a,b),bc=m(b,cc),ca=m(cc,a);
+    E(a,ab,0);E(ab,b,0);E(b,bc,0);E(bc,cc,0);E(cc,ca,0);E(ca,a,0);E(ab,bc,0);E(bc,ca,0);E(ca,ab,0);});
+  var inner=[]; V.forEach(function(v,i){nodes.push({p:norm(v,.46),k:2});var j=nodes.length-1;inner.push(j);E(i,j,1);});  // inner shell
+  F.forEach(function(f){E(inner[f[0]],inner[f[1]],2);E(inner[f[1]],inner[f[2]],2);E(inner[f[2]],inner[f[0]],2);});
+  inner.forEach(function(j){edges.push([j,-1,3]);});                        // spokes to core
+  var col={};
+  function colors(){var cs=getComputedStyle(root);
+    col.a=cs.getPropertyValue('--accent').trim();col.b=cs.getPropertyValue('--gold').trim();
+    col.c=cs.getPropertyValue('--accent-2').trim();col.ink=cs.getPropertyValue('--ink-3').trim();col.bg=cs.getPropertyValue('--paper').trim();}
+  function lighten(h,k){h=h.replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c}).join('');
+    var n=parseInt(h,16),r=n>>16&255,g=n>>8&255,b=n&255;r=Math.round(r+(255-r)*k);g=Math.round(g+(255-g)*k);b=Math.round(b+(255-b)*k);
+    return 'rgb('+r+','+g+','+b+')';}
+  var _c=colors; colors=function(){_c();var dark=getComputedStyle(root).getPropertyValue('--paper').trim().toLowerCase()==='#101615';
+    var k=dark?.14:.06; col.glow=dark?.28:.12;col.ga=lighten(col.a,k);col.gb=lighten(col.b,k);col.gc=lighten(col.c,k);};
+  colors(); new MutationObserver(function(){colors()}).observe(root,{attributes:true,attributeFilter:['data-theme']});
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){colors()});
+  var W=0,H=0;
+  function size(){var r=c.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;c.width=W*d;c.height=H*d;x.setTransform(d,0,0,d,0,0);if(reduce)draw();}
+  addEventListener('resize',size);
+  var ry=0.35, rx=0.32, tilt=0.18, drag=null, tm=0;
+  c.addEventListener('pointerdown',function(e){drag={x:e.clientX,y:e.clientY,ry:ry,rx:rx};c.setPointerCapture(e.pointerId);});
+  c.addEventListener('pointermove',function(e){if(!drag)return;ry=drag.ry+(e.clientX-drag.x)*.008;rx=Math.max(-1.2,Math.min(1.2,drag.rx+(e.clientY-drag.y)*.008));if(reduce)draw();});
+  addEventListener('pointerup',function(){drag=null;});
+  function rot(p){var cy=Math.cos(ry),sy=Math.sin(ry),cx=Math.cos(rx),sx=Math.sin(rx),ct=Math.cos(tilt),st=Math.sin(tilt);
+    var X=p[0]*cy-p[2]*sy, Z=p[0]*sy+p[2]*cy, Y=p[1]*cx-Z*sx; Z=p[1]*sx+Z*cx;
+    var X2=X*ct-Y*st, Y2=X*st+Y*ct; return [X2,Y2,Z];}
+  function proj(q){var R=Math.min(W,H)*.37, f=3.2/(3.2+q[2]); return {x:W/2+q[0]*R*f,y:H/2+q[1]*R*f,z:q[2],f:f};}
+  function depth(z){return (1-z)/2;}   // 1 = front, 0 = back
+  function dot(px,py,r,color,a){
+    x.globalAlpha=a; var g=x.createRadialGradient(px-r*.35,py-r*.35,r*.1,px,py,r);
+    g.addColorStop(0,'#ffffff');g.addColorStop(.25,color);g.addColorStop(1,color);
+    x.fillStyle=g;x.beginPath();x.arc(px,py,r,0,7);x.fill();}
+  // faceted gem: polygon split into triangular facets with light/dark shading
+  function gem(px,py,r,sides,rot,color,a,tw){
+    // soft colored glow behind the gem
+    var gl=x.createRadialGradient(px,py,r*.4,px,py,r*2.4);gl.addColorStop(0,color);gl.addColorStop(1,'transparent');
+    x.globalAlpha=a*col.glow;x.fillStyle=gl;x.beginPath();x.arc(px,py,r*2.4,0,7);x.fill();
+    var pts=[];for(var i=0;i<sides;i++){var th=rot+i*Math.PI*2/sides;pts.push([px+r*Math.cos(th),py+r*Math.sin(th)]);}
+    x.globalAlpha=a;x.fillStyle=color;x.beginPath();pts.forEach(function(q,i){x[i?'lineTo':'moveTo'](q[0],q[1]);});x.closePath();x.fill();
+    var cx=px-r*.12, cy=py-r*.12; // facet apex, nudged toward the light
+    for(i=0;i<sides;i++){var A=pts[i],B=pts[(i+1)%sides],mx=(A[0]+B[0])/2-px,my=(A[1]+B[1])/2-py;
+      var lit=-(mx+my)/(r*1.42); // light from top-left
+      x.globalAlpha=a*(lit>0?Math.min(.62,lit*.7):Math.min(.26,-lit*.3));x.fillStyle=lit>0?'#ffffff':'#000000';
+      x.beginPath();x.moveTo(cx,cy);x.lineTo(A[0],A[1]);x.lineTo(B[0],B[1]);x.closePath();x.fill();}
+    x.globalAlpha=a;x.strokeStyle='rgba(255,255,255,.5)';x.lineWidth=.6;x.beginPath();
+    pts.forEach(function(q){x.moveTo(cx,cy);x.lineTo(q[0],q[1]);});x.stroke();
+    x.globalAlpha=a*.8;x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=.8;x.beginPath();pts.forEach(function(q,i){x[i?'lineTo':'moveTo'](q[0],q[1]);});x.closePath();x.stroke();
+    // twinkling glint
+    var gx=px-r*.38, gy=py-r*.38, gs=r*(.55+.45*tw);
+    x.globalAlpha=a*(.45+.5*tw);x.strokeStyle='#ffffff';x.lineWidth=.9;x.beginPath();
+    x.moveTo(gx-gs,gy);x.lineTo(gx+gs,gy);x.moveTo(gx,gy-gs);x.lineTo(gx,gy+gs);x.stroke();
+    x.fillStyle='#ffffff';x.beginPath();x.arc(gx,gy,Math.max(.8,r*.16),0,7);x.fill();
+  }
+  function ring(rr,tiltx,a){ // equatorial orbit ring
+    x.globalAlpha=a;x.strokeStyle=col.a;x.lineWidth=1;x.setLineDash([2,6]);x.beginPath();
+    for(var i=0;i<=96;i++){var th=i/96*Math.PI*2,q=proj(rot([Math.cos(th)*rr,0,Math.sin(th)*rr]));x[i?'lineTo':'moveTo'](q.x,q.y);}
+    x.stroke();x.setLineDash([]);}
+  function draw(){
+    if(!W) return; x.clearRect(0,0,W,H);
+    var S=Math.min(W,H)/440, P=nodes.map(function(n){return proj(rot(n.p));}), core={x:W/2,y:H/2,z:0,f:1};
+    // halo
+    var R=Math.min(W,H)*.37, h=x.createRadialGradient(W/2,H/2,R*.2,W/2,H/2,R*1.15);
+    h.addColorStop(0,col.a);h.addColorStop(1,'transparent');x.globalAlpha=.07;x.fillStyle=h;x.beginPath();x.arc(W/2,H/2,R*1.15,0,7);x.fill();
+    ring(1.24,0,.4);
+    // edges
+    x.lineWidth=1;
+    edges.forEach(function(e){var a=P[e[0]],b=e[1]<0?core:P[e[1]],d=depth((a.z+b.z)/2);
+      x.strokeStyle=e[2]===0?col.ink:e[2]===3?col.b:col.c;
+      x.globalAlpha=e[2]===0?.10+.45*d*d:e[2]===3?.30:.22+.25*d;
+      x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke();});
+    // core
+    var pulse=1+Math.sin(tm*.03)*.08, cr=22*S;
+    var g=x.createRadialGradient(W/2,H/2,0,W/2,H/2,cr*3.2*pulse);g.addColorStop(0,col.gb);g.addColorStop(1,'transparent');
+    x.globalAlpha=.5;x.fillStyle=g;x.beginPath();x.arc(W/2,H/2,cr*3.2*pulse,0,7);x.fill();
+    // fading halo layer surrounding the core
+    var hr=cr*1.75*pulse, hb=x.createRadialGradient(W/2,H/2,cr*1.05,W/2,H/2,cr*2.5*pulse);
+    hb.addColorStop(0,'transparent');hb.addColorStop(.35,col.gb);hb.addColorStop(1,'transparent');
+    x.globalAlpha=.32;x.fillStyle=hb;x.beginPath();x.arc(W/2,H/2,cr*2.5*pulse,0,7);x.fill();
+    x.globalAlpha=.55;x.strokeStyle=col.gb;x.lineWidth=1.2;x.beginPath();x.arc(W/2,H/2,hr,0,7);x.stroke();
+    // ripple that expands outward and fades
+    for(var k=0;k<2;k++){var ph=((tm*.006)+k*.5)%1, rr=cr*(1.3+ph*2.6);
+      x.globalAlpha=.4*(1-ph)*(1-ph);x.lineWidth=1;x.beginPath();x.arc(W/2,H/2,rr,0,7);x.stroke();}
+    dot(W/2,H/2,cr,col.gb,1);
+    x.globalAlpha=.85;x.fillStyle='#fff';x.beginPath();x.arc(W/2-cr*.35,H/2-cr*.35,cr*.22,0,7);x.fill();
+    // nodes back→front
+    var order=P.map(function(p,i){return i}).sort(function(a,b){return P[b].z-P[a].z});
+    order.forEach(function(i){var p=P[i],n=nodes[i],d=depth(p.z);
+      var base=n.k===0?10:n.k===1?6.2:7, color=n.k===0?col.gb:n.k===1?col.ga:col.gc;
+      var sides=n.k===0?6:n.k===1?4:3, spin=n.k===0?ry*1.5:n.k===1?Math.PI/4-ry*2:-Math.PI/2+ry*2.5;
+      var tw=Math.pow(Math.max(0,Math.sin(tm*.035+i*2.39)),6);
+      gem(p.x,p.y,base*S*p.f,sides,spin,color,.45+.55*d,tw);});
+    x.globalAlpha=1;
+  }
+  function loop(){tm++;if(!drag)ry+=.0032;draw();requestAnimationFrame(loop);}
+  size(); if(!reduce) requestAnimationFrame(loop);
 })();
 </script>
 </body>
